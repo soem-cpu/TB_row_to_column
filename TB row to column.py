@@ -130,34 +130,45 @@ else:
 
     # 9️⃣ Add combined columns (all visits consolidated into single columns)
     reg_col = "Registration_number"  # Primary key for merging
-    
-    # Create aggregated data grouped by Registration_number
-    agg_data = {}
-    
+
+    # determine maximum number of visits present (globally)
+    max_visit = df["visit_no"].max() if "visit_no" in df.columns else 0
+
+    def make_combined(col_name, fmt_date=False, output_name=None):
+        """Return a Series indexed by registration containing comma-separated values for each visit.
+        Missing entries are shown as '0'; duplicates are preserved in order."""
+        if output_name is None:
+            output_name = f"c_{col_name.lower()}"
+        def joiner(g):
+            pieces = []
+            for i in range(1, max_visit + 1):
+                entry = g.loc[g["visit_no"] == i, col_name]
+                if entry.empty or pd.isna(entry.iloc[0]) or entry.iloc[0] == "":
+                    pieces.append("0")
+                else:
+                    v = entry.iloc[0]
+                    if fmt_date:
+                        try:
+                            v = pd.to_datetime(v, errors="coerce").strftime("%Y-%m-%d")
+                        except Exception:
+                            pass
+                    pieces.append(str(v))
+            return ",".join(pieces)
+        return df.groupby(reg_col).apply(joiner).rename(output_name)
+
+    # collect aggregated columns
+    agg_series = []
     if "Visit_date" in df.columns:
-        agg_data["c_visit_date"] = df.groupby(reg_col)["Visit_date"].apply(
-            lambda x: ", ".join(pd.to_datetime(x, errors="coerce").dt.strftime("%Y-%m-%d").dropna().unique())
-        )
-    
+        agg_series.append(make_combined("Visit_date", fmt_date=True, output_name="c_VD"))
     if "Sputum_Result" in df.columns:
-        agg_data["c_sputum_micro"] = df.groupby(reg_col)["Sputum_Result"].apply(
-            lambda x: ", ".join(x.dropna().unique())
-        )
-    
+        agg_series.append(make_combined("Sputum_Result", output_name="c_sputum_micro"))
     if "Truenet_Result" in df.columns:
-        agg_data["c_truenat"] = df.groupby(reg_col)["Truenet_Result"].apply(
-            lambda x: ", ".join(x.dropna().unique())
-        )
-    
+        agg_series.append(make_combined("Truenet_Result", output_name="c_truenat"))
     if "Remark" in df.columns:
-        agg_data["c_remark"] = df.groupby(reg_col)["Remark"].apply(
-            lambda x: ", ".join(x.dropna().unique())
-        )
-    
-    # Convert to DataFrame and merge with pivot
-    if agg_data:
-        agg_df = pd.DataFrame(agg_data)
-        agg_df = agg_df.reset_index()
+        agg_series.append(make_combined("Remark", output_name="c_remark"))
+
+    if agg_series:
+        agg_df = pd.concat(agg_series, axis=1).reset_index()
         pivot = pivot.merge(agg_df, on=reg_col, how="left")
 
     st.subheader("✅ Converted Data")
