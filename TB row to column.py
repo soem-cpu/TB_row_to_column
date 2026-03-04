@@ -135,7 +135,7 @@ else:
     agg_data = {}
     
     if "Visit_date" in df.columns:
-        agg_data["c_VD"] = df.groupby(reg_col)["Visit_date"].apply(
+        agg_data["c_visit_date"] = df.groupby(reg_col)["Visit_date"].apply(
             lambda x: ", ".join(pd.to_datetime(x, errors="coerce").dt.strftime("%Y-%m-%d").dropna().unique())
         )
     
