@@ -128,6 +128,38 @@ else:
         if c.startswith("Visit_date_"):
             pivot[c] = pd.to_datetime(pivot[c], errors="coerce").dt.strftime("%Y-%m-%d")
 
+    # 9️⃣ Add combined columns (all visits consolidated into single columns)
+    reg_col = "Registration_number"  # Primary key for merging
+    
+    # Create aggregated data grouped by Registration_number
+    agg_data = {}
+    
+    if "Visit_date" in df.columns:
+        agg_data["c_VD"] = df.groupby(reg_col)["Visit_date"].apply(
+            lambda x: ", ".join(pd.to_datetime(x, errors="coerce").dt.strftime("%Y-%m-%d").dropna().unique())
+        )
+    
+    if "Sputum_Result" in df.columns:
+        agg_data["c_sputum_micro"] = df.groupby(reg_col)["Sputum_Result"].apply(
+            lambda x: ", ".join(x.dropna().unique())
+        )
+    
+    if "Truenet_Result" in df.columns:
+        agg_data["c_truenat"] = df.groupby(reg_col)["Truenet_Result"].apply(
+            lambda x: ", ".join(x.dropna().unique())
+        )
+    
+    if "Remark" in df.columns:
+        agg_data["c_remark"] = df.groupby(reg_col)["Remark"].apply(
+            lambda x: ", ".join(x.dropna().unique())
+        )
+    
+    # Convert to DataFrame and merge with pivot
+    if agg_data:
+        agg_df = pd.DataFrame(agg_data)
+        agg_df = agg_df.reset_index()
+        pivot = pivot.merge(agg_df, on=reg_col, how="left")
+
     st.subheader("✅ Converted Data")
     st.dataframe(pivot, use_container_width=True)
 
